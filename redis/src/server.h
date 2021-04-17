@@ -29,21 +29,30 @@
 struct redisobject;
 
 /* error code */
-#define C_OK 0;
-#define C_ERR -1;
+#define C_OK 0
+#define C_ERR -1
 
+/* log level */
+#define LL_DEBUG 0
+#define LL_VERBOSE 1
+#define LL_NOTICE 2
+#define LL_WARNING 3
+#define LL_RAW (1<<10) /* 无需时间戳即可记录 */
+
+
+#define serverPanic(...) _serverPanic(__FILE__,__LINE__,__VA_ARGS__),redis_unreachable()
 
 /*------------------------------
  * Data type
  *-----------------------------*/
 
-#define OBJ_STRING 0; /* string object */
-#define OBJ_LIST 1; /* list object */
-#define OBJ_SET 2; /* set object */
-#define OBJ_ZSET 3;  /* sorted set object */
-#define OBJ_HASH 4; /* hash object */
-#define OBJ_MODULE 5;
-#define OBJ_STREAM 6;
+#define OBJ_STRING 0 /* string object */
+#define OBJ_LIST 1 /* list object */
+#define OBJ_SET 2 /* set object */
+#define OBJ_ZSET 3  /* sorted set object */
+#define OBJ_HASH 4 /* hash object */
+#define OBJ_MODULE 5
+#define OBJ_STREAM 6
 
 /*
  * redis object 底层数据对象
@@ -60,19 +69,27 @@ struct redisobject;
  * 
  */
 
-#define OBJ_ENCODING_RAW 0;  /* 简单动态字符串(sds) */
-#define OBJ_ENCODING_INT 1;  /* 整数 */
-#define OBJ_ENCODING_HT 2;  /* 字典(dict) */
-#define OBJ_ENCODING_ZIPMAP 3;  /* zipmap */
-#define OBJ_ENCODING_LINKEDLIST 4; /* 未使用 */
-#define OBJ_ENCODING_ZIPLIST 5; /* 压缩列表 */
-#define OBJ_ENCODING_INTSET 6;
-#define OBJ_ENCODING_SKIPLIST 7; /* 有序集合 */
-#define OBJ_ENCODING_EMBSTR 8; /* 简单动态字符串 */
-#define OBJ_ENCODING_Quicklist 9; /* 快速链表 */
-#define OBJ_ENCODING_STREAM 10; /* stream */
+#define OBJ_ENCODING_RAW 0  /* 简单动态字符串(sds) */
+#define OBJ_ENCODING_INT 1  /* 整数 */
+#define OBJ_ENCODING_HT 2  /* 字典(dict) */
+#define OBJ_ENCODING_ZIPMAP 3  /* zipmap */
+#define OBJ_ENCODING_LINKEDLIST 4 /* 未使用 */
+#define OBJ_ENCODING_ZIPLIST 5 /* 压缩列表 */
+#define OBJ_ENCODING_INTSET 6
+#define OBJ_ENCODING_SKIPLIST 7 /* 有序集合 */
+#define OBJ_ENCODING_EMBSTR 8 /* 简单动态字符串 */
+#define OBJ_ENCODING_Quicklist 9 /* 快速链表 */
+#define OBJ_ENCODING_STREAM 10 /* stream */
 
-typedef redisobject {
+
+#define LRU_BITS 24  /* 低 8bit 存储对方访问次数，高 16bit 存储对象上次访问时间 */
+
+
+#define OBJ_SHARED_REFCOUNT INT_MAX
+#define OBJ_STATIC_REFCOUNT (INT_MAX-1)
+#define OBJ_FIRST_SPECIAL_REFCOUNT OBJ_STATIC_REFCOUNT
+
+typedef struct redisobject {
     unsigned type:4;  /* data type */
     unsigned encoding:4; /* current object datastructure */
     unsigned lru:LRU_BITS;  /* 缓存淘汰，占 24bit */
@@ -85,7 +102,25 @@ typedef redisobject {
  * Redis Object Impl
  *-------------------------*/
 
-/* 引用计数相关函数 */
-void decrRefCount(obj* o);
-void decrRefCountVoid(void* o);
+/* refcount relative functions, in "object.c" file */
+void incrRefCount(robj *o);
+void decrRefCount(robj *o);
+void decrRefCountVoid(void *o);
 
+
+
+/*--------------------------
+ * Global server state
+ *-------------------------*/
+
+ struct redisServer {
+    pid_t pid;  /* Main process pid */
+    pthread_t main_thread_id;  /* Main thread id */
+
+
+    redisAtomic unsigned int lruclock;  /* redis每一秒执行系统调用获取，通过LRU_CLOCK函数获取当前时间 */
+
+
+ };
+
+ #endif
